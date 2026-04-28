@@ -86,7 +86,10 @@ client.on('interactionCreate', async interaction => {
 });
 
 if (!process.env.DISCORD_TOKEN) {
-    console.error("Lütfen .env dosyasında DISCORD_TOKEN tanımlayın.");
+    console.error("[HATA] Lütfen .env dosyasında veya Environment Variables kısmında DISCORD_TOKEN tanımlayın!");
 } else {
-    client.login(process.env.DISCORD_TOKEN);
+    console.log("Discord'a bağlanma isteği gönderiliyor...");
+    client.login(process.env.DISCORD_TOKEN)
+        .then(() => console.log("Token kabul edildi, Discord API yanıt verdi!"))
+        .catch(err => console.error("[HATA] Discord API'ye bağlanırken bir sorun oluştu:", err.message));
 }
