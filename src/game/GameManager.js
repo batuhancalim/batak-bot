@@ -18,13 +18,15 @@ class GameManager {
         const lobbyData = {
             host: hostId,
             mod: mod,
-            players: [interaction.user],
+            players: [null, null, null, null], // [Güney, Doğu, Kuzey, Batı]
             message: null
         };
+        // Kurucuyu otomatik olarak 1. Takım'a (Güney - 0. index) yerleştir
+        lobbyData.players[0] = interaction.user;
         this.lobbies.set(channelId, lobbyData);
 
         const embed = this.getLobbyEmbed(lobbyData);
-        const components = this.getLobbyComponents();
+        const components = this.getLobbyComponents(mod);
 
         await interaction.reply({ content: `**${mod === 'esli' ? 'Eşli' : 'Tekli'}** İhaleli Batak lobisi oluşturuluyor...`, ephemeral: true });
         const message = await interaction.channel.send({ embeds: [embed], components: [components] });
@@ -32,19 +34,21 @@ class GameManager {
     }
 
     getLobbyEmbed(lobbyData) {
-        let description = `Yeni bir oyun oluşturuldu! Katılmak için butona basın.\n\n**Oyuncular (${lobbyData.players.length}/4):**\n`;
+        let description = `Yeni bir oyun oluşturuldu! Katılmak istediğiniz takımı/koltuğu seçin.\n\n`;
         
         if (lobbyData.mod === 'esli') {
-            // Eşli modda takımları göster
-            description += `**Takım 1 (Kuzey-Güney):**\n`;
-            description += `1. ${lobbyData.players[0] ? lobbyData.players[0].username : '...'}\n`;
-            description += `3. ${lobbyData.players[2] ? lobbyData.players[2].username : '...'}\n\n`;
-            description += `**Takım 2 (Doğu-Batı):**\n`;
-            description += `2. ${lobbyData.players[1] ? lobbyData.players[1].username : '...'}\n`;
-            description += `4. ${lobbyData.players[3] ? lobbyData.players[3].username : '...'}\n`;
+            description += `🏠 **Takım 1 (Kuzey-Güney):**\n`;
+            description += `• Kuzey: ${lobbyData.players[2] ? `**${lobbyData.players[2].username}**` : '_Boş_'}\n`;
+            description += `• Güney: ${lobbyData.players[0] ? `**${lobbyData.players[0].username}**` : '_Boş_'}\n\n`;
+            
+            description += `🏢 **Takım 2 (Doğu-Batı):**\n`;
+            description += `• Doğu: ${lobbyData.players[1] ? `**${lobbyData.players[1].username}**` : '_Boş_'}\n`;
+            description += `• Batı: ${lobbyData.players[3] ? `**${lobbyData.players[3].username}**` : '_Boş_'}\n`;
         } else {
+            description += `**Oyuncular:**\n`;
             lobbyData.players.forEach((p, i) => {
-                description += `${i + 1}. ${p.username}\n`;
+                const yonler = ['Güney', 'Doğu', 'Kuzey', 'Batı'];
+                description += `${i + 1}. ${yonler[i]}: ${p ? `**${p.username}**` : '_Boş_'}\n`;
             });
         }
 
@@ -52,60 +56,84 @@ class GameManager {
             .setTitle(`İhaleli Batak (${lobbyData.mod === 'esli' ? 'Eşli' : 'Tekli'})`)
             .setColor(0x0099FF)
             .setDescription(description)
-            .setFooter({ text: '4 kişi olduğunda oyun başlayacak.' });
+            .setFooter({ text: 'Tüm koltuklar dolduğunda veya kurucu başlattığında oyun başlar.' });
     }
 
-    getLobbyComponents() {
-        return new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('join_game')
-                    .setLabel('Katıl / Ayrıl')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('start_early')
-                    .setLabel('Hemen Başlat (Bot Doldurur)')
-                    .setStyle(ButtonStyle.Secondary)
+    getLobbyComponents(mod) {
+        const row = new ActionRowBuilder();
+        
+        if (mod === 'esli') {
+            row.addComponents(
+                new ButtonBuilder().setCustomId('join_team_1').setLabel('Takım 1\'e Katıl (K-G)').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('join_team_2').setLabel('Takım 2\'ye Katıl (D-B)').setStyle(ButtonStyle.Success)
             );
+        } else {
+            row.addComponents(
+                new ButtonBuilder().setCustomId('join_any').setLabel('Koltuk Seç / Katıl').setStyle(ButtonStyle.Primary)
+            );
+        }
+
+        row.addComponents(
+            new ButtonBuilder().setCustomId('leave_lobby').setLabel('Ayrıl').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('start_early').setLabel('Botlarla Başlat').setStyle(ButtonStyle.Secondary)
+        );
+        
+        return row;
     }
 
     async handleInteraction(interaction) {
         const channelId = interaction.channelId;
+        if (!this.lobbies.has(channelId)) {
+             if (this.games.has(channelId)) {
+                await this.games.get(channelId).handleInteraction(interaction);
+             }
+             return;
+        }
 
-        // Lobi butonları
-        if (this.lobbies.has(channelId)) {
-            const lobbyData = this.lobbies.get(channelId);
+        const lobbyData = this.lobbies.get(channelId);
+        const userId = interaction.user.id;
+
+        if (interaction.customId === 'join_team_1' || interaction.customId === 'join_team_2' || interaction.customId === 'join_any') {
+            // Önce varsa eski yerinden çıkar
+            const oldIndex = lobbyData.players.findIndex(p => p && p.id === userId);
+            if (oldIndex !== -1) lobbyData.players[oldIndex] = null;
+
+            let success = false;
+            if (interaction.customId === 'join_team_1') {
+                if (!lobbyData.players[0]) { lobbyData.players[0] = interaction.user; success = true; }
+                else if (!lobbyData.players[2]) { lobbyData.players[2] = interaction.user; success = true; }
+            } else if (interaction.customId === 'join_team_2') {
+                if (!lobbyData.players[1]) { lobbyData.players[1] = interaction.user; success = true; }
+                else if (!lobbyData.players[3]) { lobbyData.players[3] = interaction.user; success = true; }
+            } else {
+                const emptyIdx = lobbyData.players.findIndex(p => p === null);
+                if (emptyIdx !== -1) { lobbyData.players[emptyIdx] = interaction.user; success = true; }
+            }
+
+            if (!success) return interaction.reply({ content: 'Seçtiğiniz takım veya lobi dolu!', ephemeral: true });
             
-            if (interaction.customId === 'join_game') {
-                const playerIndex = lobbyData.players.findIndex(p => p.id === interaction.user.id);
-                if (playerIndex > -1) {
-                    lobbyData.players.splice(playerIndex, 1);
-                    await interaction.reply({ content: 'Lobiden ayrıldınız.', ephemeral: true });
-                } else {
-                    if (lobbyData.players.length >= 4) {
-                        return interaction.reply({ content: 'Lobi zaten dolu!', ephemeral: true });
-                    }
-                    lobbyData.players.push(interaction.user);
-                    await interaction.reply({ content: 'Lobiye katıldınız!', ephemeral: true });
-                }
+            await interaction.reply({ content: 'Lobiye katıldınız / Takım değiştirdiniz.', ephemeral: true });
+            await lobbyData.message.edit({ embeds: [this.getLobbyEmbed(lobbyData)], components: [this.getLobbyComponents(lobbyData.mod)] });
 
-                // Lobiyi güncelle
-                await lobbyData.message.edit({ embeds: [this.getLobbyEmbed(lobbyData)], components: [this.getLobbyComponents()] });
+            if (lobbyData.players.every(p => p !== null)) await this.startGame(channelId);
+            return;
+        }
 
-                // 4 kişi olduysa oyunu başlat
-                if (lobbyData.players.length === 4) {
-                    await this.startGame(channelId);
-                }
-                return;
-            }
+        if (interaction.customId === 'leave_lobby') {
+            const idx = lobbyData.players.findIndex(p => p && p.id === userId);
+            if (idx === -1) return interaction.reply({ content: 'Zaten lobide değilsiniz.', ephemeral: true });
+            
+            lobbyData.players[idx] = null;
+            await interaction.reply({ content: 'Lobiden ayrıldınız.', ephemeral: true });
+            await lobbyData.message.edit({ embeds: [this.getLobbyEmbed(lobbyData)], components: [this.getLobbyComponents(lobbyData.mod)] });
+            return;
+        }
 
-            if (interaction.customId === 'start_early' && lobbyData.host === interaction.user.id) {
-                await interaction.reply({ content: 'Oyun eksik oyuncular botlarla doldurularak başlatılıyor...', ephemeral: true });
-                await this.startGame(channelId);
-                return;
-            } else if (interaction.customId === 'start_early') {
-                 return interaction.reply({ content: 'Sadece lobiyi kuran kişi oyunu erken başlatabilir.', ephemeral: true });
-            }
+        if (interaction.customId === 'start_early') {
+            if (lobbyData.host !== userId) return interaction.reply({ content: 'Sadece kurucu başlatabilir.', ephemeral: true });
+            await interaction.reply({ content: 'Oyun başlatılıyor...', ephemeral: true });
+            await this.startGame(channelId);
+            return;
         }
 
         // Oyun içi butonlar
@@ -121,16 +149,15 @@ class GameManager {
 
         this.lobbies.delete(channelId);
         
-        // Eksik oyuncu varsa bot ekle (test için kolaylık)
-        let botCount = 1;
-        while(lobbyData.players.length < 4) {
-            lobbyData.players.push({ id: `bot_${botCount}`, username: `Bot ${botCount}`, isBot: true });
-            botCount++;
-        }
+        // Boş koltukları botlarla doldur
+        const finalPlayers = lobbyData.players.map((p, i) => {
+            if (p) return p;
+            return { id: `bot_${i}`, username: `Bot ${i}`, isBot: true };
+        });
 
-        await lobbyData.message.edit({ components: [] }); // Lobi butonlarını kaldır
+        await lobbyData.message.edit({ components: [] });
 
-        const game = new BatakGame(lobbyData.message.channel, lobbyData.players, lobbyData.mod);
+        const game = new BatakGame(lobbyData.message.channel, finalPlayers, lobbyData.mod);
         this.games.set(channelId, game);
         
         await game.start();

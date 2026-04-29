@@ -90,7 +90,9 @@ class BatakGame {
         let description = '';
         const currentPlayer = this.players[this.turnIndex];
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
-        const actualPlayer = isDummyTurn ? this.players[this.highestBidderIndex] : currentPlayer;
+        const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
+        // Eğer yancı bot ise ihaleyi alan oynar, yancı insansa kendisi oynar.
+        const actualPlayer = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex] : currentPlayer;
 
         if (this.state === 'BIDDING') {
             description = `### 🎲 İhale Aşaması\nSıra: <@${currentPlayer.id}>\n\n**Mevcut İhale:** ${this.currentHighestBid >= this.minBid ? `**${this.currentHighestBid}** (${this.players[this.highestBidderIndex].username})` : '_Henüz yok_'}\n\n`;
@@ -273,7 +275,10 @@ class BatakGame {
         const userId = interaction.user.id;
         const currentPlayer = this.players[this.turnIndex];
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
-        const expectedUserId = isDummyTurn ? this.players[this.highestBidderIndex].id : currentPlayer.id;
+        const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
+        
+        // Kimin hamle yapma yetkisi olduğunu belirle
+        const expectedUserId = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex].id : currentPlayer.id;
 
         // İhale Butonu
         if (interaction.customId === 'open_bid_menu') {
@@ -686,9 +691,10 @@ class BatakGame {
 
     async playBotTurn() {
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
-        const actualPlayer = isDummyTurn ? this.players[this.highestBidderIndex] : this.players[this.turnIndex];
+        const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
+        const actualPlayer = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex] : this.players[this.turnIndex];
         
-        if (!actualPlayer.isBot) return; // İnsan hamlesiyse dön
+        if (!actualPlayer || !actualPlayer.isBot) return; // İnsan hamlesiyse dön
 
         if (this.state === 'BIDDING') {
             this.bids[this.turnIndex] = 'PAS';
