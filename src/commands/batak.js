@@ -19,7 +19,7 @@ module.exports = {
         const channelId = interaction.channelId;
 
         if (GameManager.hasActiveGame(channelId)) {
-            return interaction.reply({ content: 'Bu kanalda zaten aktif bir oyun veya bekleme salonu var!', ephemeral: true });
+            return interaction.reply({ content: 'Bu kanalda zaten aktif bir oyun veya bekleme salonu var! Eğer oyunun takıldığını düşünüyorsanız `/reset` komutunu kullanabilirsiniz.', ephemeral: true });
         }
 
         await GameManager.createLobby(interaction, mod);

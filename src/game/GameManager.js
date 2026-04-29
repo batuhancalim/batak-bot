@@ -135,6 +135,19 @@ class GameManager {
         
         await game.start();
     }
+
+    resetGame(channelId) {
+        const game = this.games.get(channelId);
+        const hasLobby = this.lobbies.has(channelId);
+
+        if (game || hasLobby) {
+            if (game) game.destroy();
+            this.games.delete(channelId);
+            this.lobbies.delete(channelId);
+            return true;
+        }
+        return false;
+    }
 }
 
 module.exports = new GameManager();

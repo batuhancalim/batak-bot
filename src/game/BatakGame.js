@@ -29,6 +29,16 @@ class BatakGame {
         this.dummyInteraction = null;
         this.scores = [0, 0, 0, 0];
         this.roundCount = 0;
+        this.botTimeout = null;
+        this.isDestroyed = false;
+    }
+
+    destroy() {
+        this.isDestroyed = true;
+        if (this.botTimeout) {
+            clearTimeout(this.botTimeout);
+            this.botTimeout = null;
+        }
     }
 
     async start() {
@@ -172,7 +182,8 @@ class BatakGame {
         
         const canBotPlay = this.state === 'BIDDING' || this.state === 'TRUMP_SELECTION' || this.state === 'PLAYING';
         if (canBotPlay && actualPlayer && actualPlayer.isBot) {
-            setTimeout(() => this.playBotTurn(), 1500);
+            if (this.botTimeout) clearTimeout(this.botTimeout);
+            this.botTimeout = setTimeout(() => this.playBotTurn(), 1500);
         }
     }
 
@@ -497,6 +508,7 @@ class BatakGame {
         });
 
         setTimeout(() => {
+            if (this.isDestroyed) return;
             this.currentTrick = [];
             this.turnIndex = winnerIndex;
             
