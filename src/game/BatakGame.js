@@ -73,9 +73,19 @@ class BatakGame {
     }
 
     async updateMainMessage() {
+        const stateColors = {
+            'BIDDING': 0xFFAA00,         // Turuncu
+            'TRUMP_SELECTION': 0xAA00FF, // Mor
+            'PLAYING': 0x0099FF,         // Mavi
+            'RESOLVING': 0x00FF00,       // Yeşil
+            'ENDED': 0xFFD700            // Altın
+        };
+
+        const suitEmojis = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
+        
         const embed = new EmbedBuilder()
             .setTitle(`İhaleli Batak (${this.mod === 'esli' ? 'Eşli' : 'Tekli'})`)
-            .setColor(0x0099FF);
+            .setColor(stateColors[this.state] || 0x0099FF);
             
         let description = '';
         const currentPlayer = this.players[this.turnIndex];
@@ -83,51 +93,59 @@ class BatakGame {
         const actualPlayer = isDummyTurn ? this.players[this.highestBidderIndex] : currentPlayer;
 
         if (this.state === 'BIDDING') {
-            description = `**İhale Aşaması**\nSıra: <@${currentPlayer.id}>\n\n**Mevcut İhale:** ${this.currentHighestBid >= this.minBid ? this.currentHighestBid + ' (' + this.players[this.highestBidderIndex].username + ')' : 'Yok'}\n\n`;
+            description = `### 🎲 İhale Aşaması\nSıra: <@${currentPlayer.id}>\n\n**Mevcut İhale:** ${this.currentHighestBid >= this.minBid ? `**${this.currentHighestBid}** (${this.players[this.highestBidderIndex].username})` : '_Henüz yok_'}\n\n`;
             
             this.players.forEach((p, i) => {
-                const bidText = this.bids[i] === 'PAS' ? 'PAS' : (this.bids[i] > 0 ? this.bids[i] : 'Bekliyor');
-                description += `${p.username}: ${bidText}\n`;
+                const bidText = this.bids[i] === 'PAS' ? '❌ PAS' : (this.bids[i] > 0 ? `✅ **${this.bids[i]}**` : '⏳ Bekliyor');
+                description += `> ${p.username}: ${bidText}\n`;
             });
             
         } else if (this.state === 'TRUMP_SELECTION') {
-            description = `**Koz Seçimi**\nİhaleyi alan: <@${this.players[this.highestBidderIndex].id}> (${this.currentHighestBid})\nLütfen kozu belirleyin.`;
+            description = `### 🃏 Koz Seçimi\nİhaleyi alan: <@${this.players[this.highestBidderIndex].id}> (**${this.currentHighestBid}**)\nLütfen bir koz rengi seçin...`;
         } else if (this.state === 'PLAYING' || this.state === 'RESOLVING') {
-            description = `**Oyun Aşaması**\nİhale: **${this.currentHighestBid}** (<@${this.players[this.highestBidderIndex].id}>)\nKoz: **${this.trumpSuit}**\n\n`;
+            const kozEmoji = suitEmojis[this.trumpSuit] || this.trumpSuit;
+            description = `### 🎴 Oyun Aşaması\nİhale: **${this.currentHighestBid}** (<@${this.players[this.highestBidderIndex].id}>) | Koz: **${kozEmoji}**\n`;
             
             if (this.state === 'PLAYING') {
-                description += `Sıra: <@${actualPlayer.id}> ${isDummyTurn ? '*(Eşinin eli için)*' : ''}\n\n`;
+                description += `Sıra: <@${actualPlayer.id}> ${isDummyTurn ? '*(Eşinin eli)*' : ''}\n\n`;
             } else {
                 description += `**El Sonuçlanıyor...**\n\n`;
             }
+
+            // --- GÖRSEL MASA DÜZENİ ---
+            // Oyuncuları pusula yönlerine yerleştiriyoruz: 0:Güney, 1:Doğu, 2:Kuzey, 3:Batı
+            const tableCards = ['', '', '', '']; // S, E, N, W
+            this.currentTrick.forEach(play => {
+                const idx = this.players.findIndex(p => p.id === play.player.id);
+                tableCards[idx] = `**${play.card.id}**`;
+            });
+
+            description += `\`\`\`text\n`;
+            description += `          [${this.players[2].username.slice(0,8)}]\n`;
+            description += `               ${tableCards[2] || '  ---  '}\n\n`;
+            description += `[${this.players[3].username.slice(0,8).padEnd(8)}] ${tableCards[3] || '---'}   ${tableCards[1] || '---'} [${this.players[1].username.slice(0,8)}]\n\n`;
+            description += `               ${tableCards[0] || '  ---  '}\n`;
+            description += `          [${this.players[0].username.slice(0,8)}]\n`;
+            description += `\`\`\`\n`;
+            // --------------------------
             
             if (this.dummyIndex !== -1) {
-                description += `**Yerdeki El (Eş):**\n`;
                 const dummyHand = this.hands[this.dummyIndex];
                 const dSuits = { '♠': [], '♥': [], '♦': [], '♣': [] };
                 dummyHand.forEach(c => dSuits[c.suit].push(c.value));
+                description += `**Yerdeki El:** `;
                 for (const [suit, values] of Object.entries(dSuits)) {
-                    if (values.length > 0) description += `${suit} ${values.join(', ')}\n`;
+                    if (values.length > 0) description += `${suitEmojis[suit]}${values.join('')} `;
                 }
-                description += `\n`;
+                description += `\n\n`;
             }
             
-            description += `**Masa:**\n`;
-            if (this.currentTrick.length === 0) {
-                description += `(Boş)\n`;
-            } else {
-                this.currentTrick.forEach(play => {
-                    description += `${play.player.username}: ${play.card.id}\n`;
-                });
-            }
-            
-            description += `\n**Alınan Eller:**\n`;
+            description += `**Alınan Eller:**\n`;
             if (this.mod === 'esli') {
-                description += `Takım 1 (Kuzey-Güney): ${this.tricksWon[0] + this.tricksWon[2]}\n`;
-                description += `Takım 2 (Doğu-Batı): ${this.tricksWon[1] + this.tricksWon[3]}\n`;
+                description += `🏠 Takım 1 (K-G): \`${this.tricksWon[0] + this.tricksWon[2]}\`  |  🏢 Takım 2 (D-B): \`${this.tricksWon[1] + this.tricksWon[3]}\` \n`;
             } else {
                 this.players.forEach((p, i) => {
-                    description += `${p.username}: ${this.tricksWon[i]}\n`;
+                    description += `${p.username}: \`${this.tricksWon[i]}\` `;
                 });
             }
         }
@@ -190,6 +208,7 @@ class BatakGame {
     createHandButtons(hand, validCards = [], forceDisable = false) {
         const components = [];
         let currentRow = new ActionRowBuilder();
+        const suitEmojis = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
         const suitColors = { '♠': ButtonStyle.Secondary, '♥': ButtonStyle.Danger, '♦': ButtonStyle.Danger, '♣': ButtonStyle.Primary };
         
         hand.forEach((card) => {
@@ -201,7 +220,7 @@ class BatakGame {
             currentRow.addComponents(
                 new ButtonBuilder()
                     .setCustomId(forceDisable ? `dummy_btn_${card.id}` : `play_card_${card.id}`)
-                    .setLabel(`${card.suit} ${card.value}`)
+                    .setLabel(`${suitEmojis[card.suit]} ${card.value}`)
                     .setStyle(suitColors[card.suit])
                     .setDisabled(!isPlayable)
             );
@@ -356,10 +375,10 @@ class BatakGame {
             if (userId !== currentPlayer.id) return interaction.reply({ content: 'Kozu ihale sahibi seçebilir!', ephemeral: true });
             
             const options = [
-                { label: 'Maça ♠', value: '♠' },
-                { label: 'Kupa ♥', value: '♥' },
-                { label: 'Karo ♦', value: '♦' },
-                { label: 'Sinek ♣', value: '♣' }
+                { label: 'Maça ♠️', value: '♠', emoji: '♠️' },
+                { label: 'Kupa ♥️', value: '♥', emoji: '♥️' },
+                { label: 'Karo ♦️', value: '♦', emoji: '♦️' },
+                { label: 'Sinek ♣️', value: '♣', emoji: '♣️' }
             ];
 
             const row = new ActionRowBuilder()
