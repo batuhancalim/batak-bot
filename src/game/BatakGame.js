@@ -117,8 +117,9 @@ class BatakGame {
         } else if (this.state === 'TRUMP_SELECTION') {
             description = `### 🃏 Koz Seçimi\nİhaleyi alan: <@${this.players[this.highestBidderIndex].id}> (**${this.currentHighestBid}**)\nLütfen bir koz rengi seçin...`;
         } else if (this.state === 'PLAYING' || this.state === 'RESOLVING') {
-            const kozEmoji = suitEmojis[this.trumpSuit] || this.trumpSuit;
-            description = `### 🎴 Oyun Aşaması\nİhale: **${this.currentHighestBid}** (<@${this.players[this.highestBidderIndex].id}>) | Koz: **${kozEmoji}**\n`;
+        const suitNames = { '♠': 'Maça', '♥': 'Kupa', '♦': 'Karo', '♣': 'Sinek' };
+        const kozEmoji = suitEmojis[this.trumpSuit] || this.trumpSuit;
+        description = `### 🎴 Oyun Aşaması\nİhale: **${this.currentHighestBid}** (<@${this.players[this.highestBidderIndex].id}>) | Koz: **${kozEmoji} (${suitNames[this.trumpSuit]})**\n`;
             
             if (this.state === 'PLAYING') {
                 description += `Sıra: <@${actualPlayer.id}> ${isDummyTurn ? '*(Eşinin eli)*' : ''}\n\n`;
@@ -149,7 +150,7 @@ class BatakGame {
                 dummyHand.forEach(c => dSuits[c.suit].push(c.value));
                 description += `**Yerdeki El:** `;
                 for (const [suit, values] of Object.entries(dSuits)) {
-                    if (values.length > 0) description += `${suitEmojis[suit]}${values.join('')} `;
+                    if (values.length > 0) description += `${suitEmojis[suit]} \`${values.join(' ')}\`  `;
                 }
                 description += `\n\n`;
             }
