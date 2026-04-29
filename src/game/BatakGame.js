@@ -91,8 +91,20 @@ class BatakGame {
         const currentPlayer = this.players[this.turnIndex];
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
         const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
-        // Eğer yancı bot ise ihaleyi alan oynar, yancı insansa kendisi oynar.
-        const actualPlayer = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex] : currentPlayer;
+        const bidderPlayer = this.players[this.highestBidderIndex];
+
+        // MANTIK: 
+        // 1. İhaleyi alan insansa, yancının eli kim olursa olsun ihaleyi alan oynar.
+        // 2. İhaleyi alan bot ise ve yancı insansa, yancı kendisi oynar.
+        // 3. Her ikisi de bot ise, ihaleyi alan bot oynar.
+        let actualPlayer;
+        if (isDummyTurn) {
+            if (!bidderPlayer.isBot) actualPlayer = bidderPlayer;
+            else if (!dummyPlayer.isBot) actualPlayer = dummyPlayer;
+            else actualPlayer = bidderPlayer;
+        } else {
+            actualPlayer = currentPlayer;
+        }
 
         if (this.state === 'BIDDING') {
             description = `### 🎲 İhale Aşaması\nSıra: <@${currentPlayer.id}>\n\n**Mevcut İhale:** ${this.currentHighestBid >= this.minBid ? `**${this.currentHighestBid}** (${this.players[this.highestBidderIndex].username})` : '_Henüz yok_'}\n\n`;
@@ -276,9 +288,16 @@ class BatakGame {
         const currentPlayer = this.players[this.turnIndex];
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
         const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
+        const bidderPlayer = this.players[this.highestBidderIndex];
         
-        // Kimin hamle yapma yetkisi olduğunu belirle
-        const expectedUserId = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex].id : currentPlayer.id;
+        let expectedUserId;
+        if (isDummyTurn) {
+            if (!bidderPlayer.isBot) expectedUserId = bidderPlayer.id;
+            else if (!dummyPlayer.isBot) expectedUserId = dummyPlayer.id;
+            else expectedUserId = bidderPlayer.id;
+        } else {
+            expectedUserId = currentPlayer.id;
+        }
 
         // İhale Butonu
         if (interaction.customId === 'open_bid_menu') {
@@ -698,7 +717,16 @@ class BatakGame {
     async playBotTurn() {
         const isDummyTurn = this.state === 'PLAYING' && this.turnIndex === this.dummyIndex;
         const dummyPlayer = this.dummyIndex !== -1 ? this.players[this.dummyIndex] : null;
-        const actualPlayer = (isDummyTurn && dummyPlayer && dummyPlayer.isBot) ? this.players[this.highestBidderIndex] : this.players[this.turnIndex];
+        const bidderPlayer = this.players[this.highestBidderIndex];
+        
+        let actualPlayer;
+        if (isDummyTurn) {
+            if (!bidderPlayer.isBot) actualPlayer = bidderPlayer;
+            else if (!dummyPlayer.isBot) actualPlayer = dummyPlayer;
+            else actualPlayer = bidderPlayer;
+        } else {
+            actualPlayer = this.players[this.turnIndex];
+        }
         
         if (!actualPlayer || !actualPlayer.isBot) return; // İnsan hamlesiyse dön
 
