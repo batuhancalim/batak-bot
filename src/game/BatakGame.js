@@ -468,12 +468,18 @@ class BatakGame {
             i++;
         }
 
-        if (this.passCount >= 3) {
-            if (this.highestBidderIndex === -1) {
-                // Herkes pas geçti. Mecburi ihaleyi dağıtana veya 1. oyuncuya ver
-                this.highestBidderIndex = 3; 
-                this.currentHighestBid = this.minBid;
-            }
+        const totalPass = this.bids.filter(b => b === 'PAS').length;
+        
+        // Eğer 3 kişi PAS dediyse ve birisi ihale verdiyse ihaleyi bitir
+        if (totalPass === 3 && this.highestBidderIndex !== -1) {
+            this.state = 'TRUMP_SELECTION';
+            this.turnIndex = this.highestBidderIndex;
+        } 
+        // Eğer herkes PAS dediyse (zorunlu ihale durumu)
+        else if (totalPass === 4) {
+            this.highestBidderIndex = 3; // Dağıtan (veya sonuncu) kişiye kalır
+            this.currentHighestBid = this.minBid;
+            this.bids[3] = this.minBid;
             this.state = 'TRUMP_SELECTION';
             this.turnIndex = this.highestBidderIndex;
         }
